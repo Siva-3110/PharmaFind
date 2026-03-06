@@ -1,0 +1,23 @@
+# Virtual Environment
+venv/
+.env
+
+# Backend cache
+__pycache__/
+*.pyc
+
+# Database
+pharmafind.db
+*.sqlite3
+
+# Frontend
+node_modules/
+dist/
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+
+# Ignore large downloaded models if any
+*.pkl
