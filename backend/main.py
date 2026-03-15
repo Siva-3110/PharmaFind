@@ -189,16 +189,64 @@ def delete_inventory_item(item_id: int, db: Session = Depends(database.get_db)):
     db.commit()
     return {'status': 'success'}
 
-@app.get('/api/pharmacy/requests', response_model=list[schemas.MedicineRequestResponse])
-def get_medicine_requests(pharmacy_id: int, db: Session = Depends(database.get_db)):
-    return db.query(models.MedicineRequest).filter(models.MedicineRequest.pharmacy_id == pharmacy_id).all()
+import json
 
-@app.put('/api/pharmacy/requests/{request_id}/status')
-def update_request_status(request_id: int, status: str, db: Session = Depends(database.get_db)):
+@app.post('/create-request', response_model=schemas.MedicineRequestResponse)
+def create_medicine_request(request: schemas.MedicineRequestCreate, db: Session = Depends(database.get_db)):
+    # Validate customer and pharmacy
+    customer = db.query(models.User).filter(models.User.user_id == request.customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail='Customer not found')
+        
+    pharmacy = db.query(models.Pharmacy).filter(models.Pharmacy.id == request.pharmacy_id).first()
+    if not pharmacy:
+        raise HTTPException(status_code=404, detail='Pharmacy not found')
+        
+    db_req = models.MedicineRequest(
+        user_id=request.customer_id,
+        pharmacy_id=request.pharmacy_id,
+        prescription_id=request.prescription_id,
+        requested_medicines=json.dumps(request.medicines),
+        status='Pending'
+    )
+    db.add(db_req)
+    db.commit()
+    db.refresh(db_req)
+    return db_req
+
+@app.get('/api/pharmacy/requests/{pharmacy_id}', response_model=list[schemas.PharmacyMedicineRequestResponse])
+def get_pharmacy_requests(pharmacy_id: int, db: Session = Depends(database.get_db)):
+    requests = db.query(models.MedicineRequest, models.User).join(
+        models.User, models.MedicineRequest.user_id == models.User.user_id
+    ).filter(models.MedicineRequest.pharmacy_id == pharmacy_id).all()
+    
+    result = []
+    for req, user in requests:
+        resp_dict = schemas.MedicineRequestResponse.model_validate(req).model_dump()
+        resp_dict['customer_name'] = user.name
+        result.append(resp_dict)
+        
+    return result
+
+@app.get('/customer/requests/{customer_id}', response_model=list[schemas.MedicineRequestResponse])
+def get_customer_requests(customer_id: int, db: Session = Depends(database.get_db)):
+    return db.query(models.MedicineRequest).filter(models.MedicineRequest.user_id == customer_id).all()
+
+@app.post('/request/accept/{request_id}')
+def accept_request(request_id: int, db: Session = Depends(database.get_db)):
     req = db.query(models.MedicineRequest).filter(models.MedicineRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail='Request not found')
-    req.status = status
+    req.status = 'Accepted'
+    db.commit()
+    return {'status': 'success'}
+
+@app.post('/request/reject/{request_id}')
+def reject_request(request_id: int, db: Session = Depends(database.get_db)):
+    req = db.query(models.MedicineRequest).filter(models.MedicineRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail='Request not found')
+    req.status = 'Rejected'
     db.commit()
     return {'status': 'success'}
 

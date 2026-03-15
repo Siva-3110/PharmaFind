@@ -5,15 +5,37 @@ import { ClipboardList, Check, X } from 'lucide-react';
 const Requests = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
-    const pharmacyId = 1; // Demo ID
+    const [pharmacyId, setPharmacyId] = useState(null);
+    const userId = localStorage.getItem('user_id');
 
     useEffect(() => {
-        fetchRequests();
-    }, []);
+        if (userId) {
+            fetchPharmacyProfile();
+        }
+    }, [userId]);
+
+    const fetchPharmacyProfile = async () => {
+        try {
+            const res = await fetch(`http://localhost:8000/api/pharmacy/profile?user_id=${userId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setPharmacyId(data.id);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    useEffect(() => {
+        if (pharmacyId) {
+            fetchRequests();
+        }
+    }, [pharmacyId]);
 
     const fetchRequests = async () => {
+        setLoading(true);
         try {
-            const res = await fetch(`http://localhost:8000/api/pharmacy/requests?pharmacy_id=${pharmacyId}`);
+            const res = await fetch(`http://localhost:8000/api/pharmacy/requests/${pharmacyId}`);
             if (res.ok) {
                 const data = await res.json();
                 setRequests(data);
@@ -27,8 +49,9 @@ const Requests = () => {
 
     const handleStatusUpdate = async (id, newStatus) => {
         try {
-            await fetch(`http://localhost:8000/api/pharmacy/requests/${id}/status?status=${newStatus}`, {
-                method: 'PUT'
+            const endpoint = newStatus === 'Accepted' ? 'accept' : 'reject';
+            await fetch(`http://localhost:8000/request/${endpoint}/${id}`, {
+                method: 'POST'
             });
             fetchRequests(); // Refresh list automatically
         } catch (err) {
@@ -61,17 +84,26 @@ const Requests = () => {
                                     <div className="flex items-center gap-3 mb-2">
                                         <span className="text-slate-400 text-sm">Request #{req.id}</span>
                                         <span className="text-slate-500 text-sm">•</span>
-                                        <span className="text-slate-400 text-sm">Customer ID: {req.user_id}</span>
+                                        <span className="text-slate-400 text-sm font-medium">Customer: {req.customer_name}</span>
                                         <span className="text-slate-500 text-sm">•</span>
                                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${req.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                                req.status === 'Confirmed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                                    'bg-red-500/10 text-red-400 border-red-500/20'
+                                            req.status === 'Accepted' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                'bg-red-500/10 text-red-400 border-red-500/20'
                                             }`}>
                                             {req.status}
                                         </span>
                                     </div>
                                     <h3 className="text-lg font-medium text-white">Requested Medicines:</h3>
-                                    <p className="text-blue-400 mt-1">{req.requested_medicines}</p>
+                                    <p className="text-blue-400 mt-1">
+                                        {(() => {
+                                            try {
+                                                const parsed = JSON.parse(req.requested_medicines);
+                                                return Array.isArray(parsed) ? parsed.join(', ') : req.requested_medicines;
+                                            } catch {
+                                                return req.requested_medicines;
+                                            }
+                                        })()}
+                                    </p>
                                     <p className="text-slate-500 text-sm mt-3">Requested on: {new Date(req.request_date).toLocaleString()}</p>
                                 </div>
 
@@ -84,15 +116,15 @@ const Requests = () => {
                                             <X size={18} /> Reject
                                         </button>
                                         <button
-                                            onClick={() => handleStatusUpdate(req.id, 'Confirmed')}
+                                            onClick={() => handleStatusUpdate(req.id, 'Accepted')}
                                             className="flex items-center gap-2 px-4 py-2 rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 transition-all font-medium"
                                         >
-                                            <Check size={18} /> Confirm Availability
+                                            <Check size={18} /> Accept Request
                                         </button>
                                     </div>
                                 ) : (
                                     <div className="px-4 py-2 text-slate-500 italic text-sm border border-dashed border-slate-700 rounded-xl">
-                                        Processed Status
+                                        Status: {req.status}
                                     </div>
                                 )}
                             </div>

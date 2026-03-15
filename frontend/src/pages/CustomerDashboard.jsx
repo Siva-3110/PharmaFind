@@ -17,14 +17,42 @@ function CustomerDashboard() {
     const [predictions, setPredictions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [pharmacies, setPharmacies] = useState([]);
+    const [selectedPharmacy, setSelectedPharmacy] = useState("");
+    const [myRequests, setMyRequests] = useState([]);
+
     const navigate = useNavigate();
     const fileInputRef = useRef();
     const userId = localStorage.getItem('user_id');
     const role = localStorage.getItem('role');
 
     useEffect(() => {
-        if (!localStorage.getItem('token')) navigate('/login');
+        if (!localStorage.getItem('token')) {
+            navigate('/login');
+            return;
+        }
+        fetchPharmacies();
+        fetchMyRequests();
     }, [navigate]);
+
+    const fetchPharmacies = async () => {
+        try {
+            const res = await axios.get('http://localhost:8000/api/admin/pharmacies');
+            setPharmacies(res.data.filter(p => p.status === 'Approved'));
+        } catch (err) {
+            console.error("Failed to fetch pharmacies", err);
+        }
+    };
+
+    const fetchMyRequests = async () => {
+        if (!userId) return;
+        try {
+            const res = await axios.get(`http://localhost:8000/customer/requests/${userId}`);
+            setMyRequests(res.data);
+        } catch (err) {
+            console.error("Failed to fetch requests", err);
+        }
+    };
 
     const handleFile = (selectedFile) => {
         if (selectedFile) setFile(selectedFile);
@@ -67,9 +95,39 @@ function CustomerDashboard() {
         try {
             await axios.post(`http://localhost:8000/update-medicines/${prescription.prescription_id}`, medicines);
             setSaved(true);
-            setTimeout(() => { setPrescription(null); setFile(null); setSaved(false); }, 1800);
+            setTimeout(() => { setPrescription(null); setFile(null); setSaved(false); setSelectedPharmacy(""); }, 1800);
         } catch {
             alert('Error saving medicines.');
+        }
+    };
+
+    const sendRequestToPharmacy = async () => {
+        if (!selectedPharmacy) {
+            alert("Please select a pharmacy first.");
+            return;
+        }
+
+        const medicineNames = medicines.map(m => `${m.medicine_name} (${m.dosage})`);
+
+        try {
+            await axios.post('http://localhost:8000/create-request', {
+                customer_id: parseInt(userId),
+                pharmacy_id: parseInt(selectedPharmacy),
+                prescription_id: prescription.prescription_id,
+                medicines: medicineNames
+            });
+
+            alert('Request sent successfully!');
+            fetchMyRequests(); // Refresh the list below
+
+            // Clear the view
+            setPrescription(null);
+            setFile(null);
+            setSelectedPharmacy("");
+
+        } catch (err) {
+            console.error(err);
+            alert('Error sending request.');
         }
     };
 
@@ -319,39 +377,138 @@ function CustomerDashboard() {
                             </div>
 
                             {/* Action Buttons */}
-                            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                                <motion.button
-                                    onClick={() => { setPrescription(null); setFile(null); }}
-                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                                    className="btn-outline"
-                                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                                >
-                                    <FaUpload size={13} /> Upload Another
-                                </motion.button>
-                                <motion.button
-                                    onClick={() => setMedicines([...medicines, { medicine_name: '', dosage: '', confidence_score: 100, status: 'Manually Added' }])}
-                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                        background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)',
-                                        borderRadius: '12px', padding: '13px 24px', color: '#6ee7b7',
-                                        fontWeight: 600, cursor: 'pointer', fontSize: '15px',
-                                    }}
-                                >
-                                    <FaPlus size={13} /> Add Medicine
-                                </motion.button>
-                                <motion.button
-                                    onClick={handleSave}
-                                    className="btn-gradient"
-                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'center' }}
-                                >
-                                    {saved ? <><FaCheckCircle /> Saved!</> : <><FaSave /> Confirm & Save</>}
-                                </motion.button>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                                    <motion.button
+                                        onClick={() => { setPrescription(null); setFile(null); }}
+                                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                        className="btn-outline"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                    >
+                                        <FaUpload size={13} /> Cancel & Upload Another
+                                    </motion.button>
+                                    <motion.button
+                                        onClick={() => setMedicines([...medicines, { medicine_name: '', dosage: '', confidence_score: 100, status: 'Manually Added' }])}
+                                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)',
+                                            borderRadius: '12px', padding: '13px 24px', color: '#6ee7b7',
+                                            fontWeight: 600, cursor: 'pointer', fontSize: '15px',
+                                        }}
+                                    >
+                                        <FaPlus size={13} /> Add Custom Medicine
+                                    </motion.button>
+                                </div>
+
+                                {/* Pharmacy Selection & Request */}
+                                <div style={{
+                                    background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.2)',
+                                    borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px'
+                                }}>
+                                    <h4 style={{ margin: 0, color: '#f8fafc', fontSize: '16px', fontWeight: 600 }}>Send to Pharmacy</h4>
+                                    <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <select
+                                            value={selectedPharmacy}
+                                            onChange={(e) => setSelectedPharmacy(e.target.value)}
+                                            className="glass-input"
+                                            style={{ flex: 1, minWidth: '250px', padding: '14px', appearance: 'none' }}
+                                        >
+                                            <option value="" disabled>-- Select a nearby Pharmacy --</option>
+                                            {pharmacies.map(p => (
+                                                <option key={p.id} value={p.id} style={{ color: '#000' }}>
+                                                    {p.name} - {p.location || "Unknown Location"}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <motion.button
+                                            onClick={sendRequestToPharmacy}
+                                            className="btn-gradient"
+                                            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                            disabled={!selectedPharmacy || medicines.length === 0}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                opacity: (!selectedPharmacy || medicines.length === 0) ? 0.5 : 1,
+                                                cursor: (!selectedPharmacy || medicines.length === 0) ? 'not-allowed' : 'pointer'
+                                            }}
+                                        >
+                                            <FaCloudUploadAlt /> Send Request
+                                        </motion.button>
+                                    </div>
+                                </div>
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* ===== MY REQUESTS SECTION ===== */}
+                <div style={{ marginTop: '60px' }}>
+                    <h2 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '24px', color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        Your Medicine Requests
+                    </h2>
+
+                    {myRequests.length === 0 ? (
+                        <div style={{
+                            padding: '40px', textAlign: 'center', background: 'rgba(255,255,255,0.02)',
+                            borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.1)'
+                        }}>
+                            <p style={{ color: '#64748b', fontSize: '15px' }}>
+                                You haven't sent any medicine requests yet. Upload a prescription to get started.
+                            </p>
+                        </div>
+                    ) : (
+                        <div style={{
+                            background: 'rgba(255,255,255,0.03)', borderRadius: '16px',
+                            border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden'
+                        }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                <thead>
+                                    <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <th style={{ padding: '16px 24px', color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase' }}>Date</th>
+                                        <th style={{ padding: '16px 24px', color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase' }}>Medicines</th>
+                                        <th style={{ padding: '16px 24px', color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase' }}>Pharmacy ID</th>
+                                        <th style={{ padding: '16px 24px', color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase' }}>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {myRequests.map((req, i) => (
+                                        <tr key={req.id || i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '16px 24px', color: '#e2e8f0', fontSize: '14px' }}>
+                                                {new Date(req.request_date).toLocaleDateString()}
+                                            </td>
+                                            <td style={{ padding: '16px 24px', color: '#e2e8f0', fontSize: '14px', maxWidth: '300px' }}>
+                                                {(() => {
+                                                    try {
+                                                        const parsed = JSON.parse(req.requested_medicines);
+                                                        return Array.isArray(parsed) ? parsed.join(', ') : req.requested_medicines;
+                                                    } catch {
+                                                        return req.requested_medicines;
+                                                    }
+                                                })()}
+                                            </td>
+                                            <td style={{ padding: '16px 24px', color: '#94a3b8', fontSize: '14px' }}>
+                                                # {req.pharmacy_id}
+                                            </td>
+                                            <td style={{ padding: '16px 24px' }}>
+                                                <span style={{
+                                                    fontSize: '12px', fontWeight: 600, padding: '4px 10px', borderRadius: '999px',
+                                                    background: req.status === 'Accepted' ? 'rgba(52,211,153,0.15)' :
+                                                        req.status === 'Rejected' ? 'rgba(239,68,68,0.15)' :
+                                                            'rgba(251,191,36,0.15)',
+                                                    color: req.status === 'Accepted' ? '#6ee7b7' :
+                                                        req.status === 'Rejected' ? '#fca5a5' :
+                                                            '#fde68a',
+                                                }}>
+                                                    {req.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <style>{`

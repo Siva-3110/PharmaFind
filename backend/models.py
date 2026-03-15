@@ -58,12 +58,14 @@ class MedicineRequest(Base):
     id = Column(Integer, primary_key=True, index=True)
     pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"))
     user_id = Column(Integer, ForeignKey("users.user_id"))
+    prescription_id = Column(Integer, ForeignKey("prescriptions.prescription_id"), nullable=True)
     requested_medicines = Column(String) # JSON or comma-separated list
-    status = Column(String, default="Pending") # 'Pending', 'Confirmed', 'Rejected'
+    status = Column(String, default="Pending") # 'Pending', 'accepted', 'rejected'
     request_date = Column(DateTime, default=datetime.datetime.utcnow)
     
     pharmacy = relationship("Pharmacy", back_populates="requests")
     user = relationship("User")
+    prescription = relationship("Prescription")
 
 
 class Prescription(Base):

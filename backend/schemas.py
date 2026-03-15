@@ -95,18 +95,26 @@ class InventoryItemResponse(InventoryItemBase):
 class MedicineRequestBase(BaseModel):
     requested_medicines: str  # JSON string or comma-separated
 
-class MedicineRequestCreate(MedicineRequestBase):
+class MedicineRequestCreate(BaseModel):
+    customer_id: int
     pharmacy_id: int
+    prescription_id: Optional[int] = None
+    medicines: List[str]
 
 class MedicineRequestResponse(MedicineRequestBase):
     id: int
     pharmacy_id: int
     user_id: int
+    prescription_id: Optional[int] = None
     status: str
     request_date: datetime
     
     class Config:
         from_attributes = True
+
+# Extended response for Pharmacy Dashboard to easily show Customer Name
+class PharmacyMedicineRequestResponse(MedicineRequestResponse):
+    customer_name: str
 
 # --- Admin Models ---
 
