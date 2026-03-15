@@ -28,12 +28,18 @@ function Login() {
 
             localStorage.setItem('token', res.data.access_token);
             localStorage.setItem('user_id', res.data.user_id);
-            localStorage.setItem('role', res.data.role);
+            localStorage.setItem('user_name', res.data.name); // Assuming 'name' is returned
+            localStorage.setItem('user_role', res.data.role);
 
-            if (res.data.role === 'Customer') {
+            if (res.data.role === "Pharmacy Owner") {
+                navigate('/pharmacy/dashboard');
+            } else if (res.data.role === "Customer") {
                 navigate('/dashboard');
+            } else if (res.data.role === "Admin") {
+                navigate('/admin/dashboard');
             } else {
-                setError('Only Customer dashboard is available in this prototype.');
+                // Handle other roles or unexpected roles
+                setError('Unsupported user role. Please contact support.');
             }
         } catch (err) {
             setError('Invalid email or password. Please try again.');
