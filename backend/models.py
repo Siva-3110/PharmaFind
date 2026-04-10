@@ -27,10 +27,13 @@ class Pharmacy(Base):
     user_id = Column(Integer, ForeignKey("users.user_id"), unique=True)
     name = Column(String, index=True)
     location = Column(String)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     phone = Column(String)
     opening_hours = Column(String)
     rating = Column(Float, default=4.5)
     status = Column(String, default="Approved") # 'Approved', 'Pending', 'Suspended'
+    is_active = Column(Boolean, default=True)
     
     user = relationship("User", back_populates="pharmacy_profile")
     inventory = relationship("InventoryItem", back_populates="pharmacy")

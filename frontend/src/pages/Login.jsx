@@ -88,13 +88,15 @@ function Login() {
                 <form onSubmit={handleLogin}>
                     {/* Email */}
                     <div style={{ marginBottom: '18px' }}>
-                        <label style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                        <label htmlFor="email" style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
                             Email Address
                         </label>
                         <div style={{ position: 'relative' }}>
                             <FaEnvelope style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#4b5563' }} />
                             <input
-                                type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                                id="email" name="email" type="email" required
+                                value={email} onChange={e => setEmail(e.target.value)}
+                                autoComplete="email"
                                 className="glass-input" placeholder="your@email.com"
                                 style={{ paddingLeft: '42px' }}
                             />
@@ -103,13 +105,15 @@ function Login() {
 
                     {/* Password */}
                     <div style={{ marginBottom: '28px' }}>
-                        <label style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                        <label htmlFor="password" style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
                             Password
                         </label>
                         <div style={{ position: 'relative' }}>
                             <FaLock style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#4b5563' }} />
                             <input
-                                type="password" required value={password} onChange={e => setPassword(e.target.value)}
+                                id="password" name="password" type="password" required
+                                value={password} onChange={e => setPassword(e.target.value)}
+                                autoComplete="current-password"
                                 className="glass-input" placeholder="Enter your password"
                                 style={{ paddingLeft: '42px' }}
                             />

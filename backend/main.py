@@ -131,6 +131,73 @@ def get_user_prescriptions(user_id: int, db: Session = Depends(database.get_db))
 
 
 # ==========================================
+# SMART PHARMACY RECOMMENDATION ROUTE
+# ==========================================
+import math
+
+def calculate_haversine_distance(lat1, lon1, lat2, lon2):
+    R = 6371.0 # Earth radius in kilometers
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+@app.post("/recommend-pharmacies", response_model=List[schemas.RecommendationResponse])
+def recommend_pharmacies(request: schemas.RecommendationRequest, db: Session = Depends(database.get_db)):
+    # 1. Fetch active registered pharmacies
+    active_pharmacies = db.query(models.Pharmacy).filter(models.Pharmacy.status == 'Approved', models.Pharmacy.is_active == True).all()
+    
+    recommendations = []
+    req_meds = [m.lower().strip() for m in request.medicines]
+    
+    # 2. For each pharmacy, check if all required medicines are in inventory
+    for pharmacy in active_pharmacies:
+        if pharmacy.latitude is None or pharmacy.longitude is None:
+            continue
+            
+        inventory_items = db.query(models.InventoryItem).filter(models.InventoryItem.pharmacy_id == pharmacy.id).all()
+        # Find names of medicines that have stock
+        available_meds = [item for item in inventory_items if item.quantity > 0 or item.status == 'Available']
+        
+        all_found = True
+        matched_meds_original_case = []
+        
+        for req_med in req_meds:
+            found = False
+            for avail_item in available_meds:
+                avail_name_lower = avail_item.medicine_name.lower().strip()
+                if req_med in avail_name_lower or avail_name_lower in req_med:
+                    found = True
+                    if avail_item.medicine_name not in matched_meds_original_case:
+                        matched_meds_original_case.append(avail_item.medicine_name)
+                    break
+            if not found:
+                all_found = False
+                break
+                
+        if all_found and req_meds:
+            # 3. Calculate distance
+            dist_km = calculate_haversine_distance(request.latitude, request.longitude, pharmacy.latitude, pharmacy.longitude)
+            recommendations.append({
+                "pharmacy_name": pharmacy.name,
+                "distance_value": dist_km,
+                "distance": f"{dist_km:.1f} km",
+                "available_medicines": matched_meds_original_case
+            })
+            
+    # 4. Sort by distance ascending
+    recommendations.sort(key=lambda x: x["distance_value"])
+    
+    return [
+        schemas.RecommendationResponse(
+            pharmacy_name=rec["pharmacy_name"],
+            distance=rec["distance"],
+            available_medicines=rec["available_medicines"]
+        ) for rec in recommendations
+    ]
+
+# ==========================================
 # PHARMACY OWNER DASHBOARD ROUTES
 # ==========================================
 

@@ -20,6 +20,8 @@ function CustomerDashboard() {
     const [pharmacies, setPharmacies] = useState([]);
     const [selectedPharmacy, setSelectedPharmacy] = useState("");
     const [myRequests, setMyRequests] = useState([]);
+    const [recommendedPharmacies, setRecommendedPharmacies] = useState(null);
+    const [findingPharmacies, setFindingPharmacies] = useState(false);
 
     const navigate = useNavigate();
     const fileInputRef = useRef();
@@ -101,6 +103,41 @@ function CustomerDashboard() {
         }
     };
 
+    const findNearbyPharmacies = () => {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser");
+            return;
+        }
+        
+        setFindingPharmacies(true);
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            try {
+                const medNames = medicines.map(m => m.medicine_name).filter(name => name !== "Unknown" && name.trim() !== "");
+                
+                const payload = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    medicines: medNames
+                };
+                
+                const res = await axios.post('http://localhost:8000/recommend-pharmacies', payload);
+                if (res.data.length === 0) {
+                    setRecommendedPharmacies([]);
+                } else {
+                    setRecommendedPharmacies(res.data);
+                }
+            } catch (err) {
+                console.error("Error finding pharmacies", err);
+                alert("Failed to find nearby pharmacies.");
+            }
+            setFindingPharmacies(false);
+        }, (error) => {
+            console.error("Geolocation error", error);
+            alert("Unable to retrieve your location. Check browser permissions.");
+            setFindingPharmacies(false);
+        });
+    };
+
     const sendRequestToPharmacy = async () => {
         if (!selectedPharmacy) {
             alert("Please select a pharmacy first.");
@@ -124,6 +161,7 @@ function CustomerDashboard() {
             setPrescription(null);
             setFile(null);
             setSelectedPharmacy("");
+            setRecommendedPharmacies(null);
 
         } catch (err) {
             console.error(err);
@@ -407,34 +445,65 @@ function CustomerDashboard() {
                                     borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px'
                                 }}>
                                     <h4 style={{ margin: 0, color: '#f8fafc', fontSize: '16px', fontWeight: 600 }}>Send to Pharmacy</h4>
-                                    <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                        <select
-                                            value={selectedPharmacy}
-                                            onChange={(e) => setSelectedPharmacy(e.target.value)}
-                                            className="glass-input"
-                                            style={{ flex: 1, minWidth: '250px', padding: '14px', appearance: 'none' }}
-                                        >
-                                            <option value="" disabled>-- Select a nearby Pharmacy --</option>
-                                            {pharmacies.map(p => (
-                                                <option key={p.id} value={p.id} style={{ color: '#000' }}>
-                                                    {p.name} - {p.location || "Unknown Location"}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <motion.button
-                                            onClick={sendRequestToPharmacy}
-                                            className="btn-gradient"
-                                            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                                            disabled={!selectedPharmacy || medicines.length === 0}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: '8px',
-                                                opacity: (!selectedPharmacy || medicines.length === 0) ? 0.5 : 1,
-                                                cursor: (!selectedPharmacy || medicines.length === 0) ? 'not-allowed' : 'pointer'
-                                            }}
-                                        >
-                                            <FaCloudUploadAlt /> Send Request
-                                        </motion.button>
-                                    </div>
+                                    
+                                    {!recommendedPharmacies ? (
+                                        <div style={{ textAlign: 'center' }}>
+                                            <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '16px' }}>
+                                                Let us find pharmacies near you that have ALL these medicines in stock.
+                                            </p>
+                                            <motion.button
+                                                onClick={findNearbyPharmacies}
+                                                disabled={medicines.filter(m => m.medicine_name && m.medicine_name !== 'Unknown').length === 0 || findingPharmacies}
+                                                className="btn-gradient"
+                                                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', opacity: medicines.filter(m => m.medicine_name && m.medicine_name !== 'Unknown').length === 0 ? 0.5 : 1 }}
+                                            >
+                                                {findingPharmacies ? <><FaSpinner style={{ animation: 'spin 1s linear infinite' }} /> Scanning Inventory...</> : 'Find Nearby Pharmacies'}
+                                            </motion.button>
+                                        </div>
+                                    ) : recommendedPharmacies.length === 0 ? (
+                                        <div style={{ textAlign: 'center', color: '#fca5a5' }}>
+                                            <p>No pharmacies found with all these medicines near your location.</p>
+                                            <button onClick={() => setRecommendedPharmacies(null)} style={{ marginTop: '10px', background: 'transparent', color: '#38bdf8', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Try again</button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <p style={{ color: '#6ee7b7', fontSize: '14px', fontWeight: 600 }}>
+                                                Found {recommendedPharmacies.length} pharmacies with complete stock!
+                                            </p>
+                                            
+                                            <select
+                                                value={selectedPharmacy}
+                                                onChange={(e) => setSelectedPharmacy(e.target.value)}
+                                                className="glass-input"
+                                                style={{ width: '100%', padding: '14px', appearance: 'none' }}
+                                            >
+                                                <option value="" disabled>-- Select a Pharmacy --</option>
+                                                {recommendedPharmacies.map((rp, idx) => {
+                                                    const pharmMatch = pharmacies.find(p => p.name === rp.pharmacy_name);
+                                                    const pid = pharmMatch ? pharmMatch.id : idx;
+                                                    return (
+                                                        <option key={pid} value={pid} style={{ color: '#000' }}>
+                                                            {rp.pharmacy_name} - {rp.distance} away
+                                                        </option>
+                                                    );
+                                                })}
+                                            </select>
+                                            
+                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                                                <button onClick={() => setRecommendedPharmacies(null)} style={{ background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>Back</button>
+                                                <motion.button
+                                                    onClick={sendRequestToPharmacy}
+                                                    className="btn-gradient"
+                                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                                    disabled={!selectedPharmacy}
+                                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: !selectedPharmacy ? 0.5 : 1, cursor: !selectedPharmacy ? 'not-allowed' : 'pointer', padding: '10px 20px', fontSize: '14px' }}
+                                                >
+                                                    <FaCloudUploadAlt /> Send Request
+                                                </motion.button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>

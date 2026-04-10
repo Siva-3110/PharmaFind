@@ -30,10 +30,10 @@ function Signup() {
     };
 
     const fields = [
-        { icon: <FaUser />, name: 'name', type: 'text', placeholder: 'Full Name', label: 'Full Name' },
-        { icon: <FaEnvelope />, name: 'email', type: 'email', placeholder: 'Email Address', label: 'Email' },
-        { icon: <FaPhone />, name: 'phone', type: 'text', placeholder: 'Phone Number', label: 'Phone' },
-        { icon: <FaLock />, name: 'password', type: 'password', placeholder: 'Create Password', label: 'Password' },
+        { icon: <FaUser />, name: 'name', type: 'text', placeholder: 'Full Name', label: 'Full Name', autoComplete: 'name' },
+        { icon: <FaEnvelope />, name: 'email', type: 'email', placeholder: 'Email Address', label: 'Email', autoComplete: 'email' },
+        { icon: <FaPhone />, name: 'phone', type: 'tel', placeholder: 'Phone Number', label: 'Phone', autoComplete: 'tel' },
+        { icon: <FaLock />, name: 'password', type: 'password', placeholder: 'Create Password', label: 'Password', autoComplete: 'new-password' },
     ];
 
     return (
@@ -66,9 +66,9 @@ function Signup() {
                 )}
 
                 <form onSubmit={handleSignup}>
-                    {fields.map(({ icon, name, type, placeholder, label }) => (
+                    {fields.map(({ icon, name, type, placeholder, label, autoComplete }) => (
                         <div key={name} style={{ marginBottom: '16px' }}>
-                            <label style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '7px' }}>
+                            <label htmlFor={name} style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '7px' }}>
                                 {label}
                             </label>
                             <div style={{ position: 'relative' }}>
@@ -76,8 +76,9 @@ function Signup() {
                                     {icon}
                                 </span>
                                 <input
-                                    type={type} name={name} required
+                                    id={name} type={type} name={name} required
                                     onChange={handleChange} placeholder={placeholder}
+                                    autoComplete={autoComplete}
                                     className="glass-input" style={{ paddingLeft: '42px' }}
                                 />
                             </div>

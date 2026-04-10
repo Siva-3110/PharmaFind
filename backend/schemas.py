@@ -157,3 +157,16 @@ class TopMedicineStats(BaseModel):
 class AdminAnalyticsResponse(BaseModel):
     weeklyData: List[WeeklyUploadStats]
     topMedicines: List[TopMedicineStats]
+
+# --- Recommendation Models ---
+
+class RecommendationRequest(BaseModel):
+    latitude: float
+    longitude: float
+    medicines: List[str]
+
+class RecommendationResponse(BaseModel):
+    pharmacy_name: str
+    distance: str
+    available_medicines: List[str]
+
